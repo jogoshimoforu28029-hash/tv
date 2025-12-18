@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cinema Player</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+        }
+
+        video {
+            width: 100%;
+            height: 100vh;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="player"></div>
+
+    <script>
+        // Получаем магнит-ссылку из адреса
+        const urlParams = new URLSearchParams(window.location.search);
+        const magnet = urlParams.get('magnet');
+
+        if (magnet) {
+            // Вставляем чистый видео-тег, который SDK превратит в плеер
+            document.getElementById('player').innerHTML = `
+                <video controls src="${magnet}" data-player="video.js"></video>
+            `;
+        } else {
+            document.body.innerHTML = '<div style="color:white;padding:20px;">ОШИБКА: МАГНИТ-ССЫЛКА НЕ ПЕРЕДАНА</div>';
+        }
+    </script>
+
+    <!-- Подключаем SDK, который убирает лишний мусор и рекламу -->
+    <script src="https://cdn.jsdelivr.net/npm/@webtor/embed-sdk-js/dist/index.min.js" charset="utf-8" async></script>
+</body>
+
+</html>
