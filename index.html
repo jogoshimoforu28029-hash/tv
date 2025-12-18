@@ -5,61 +5,154 @@
     <meta charset="UTF-8">
     <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cinema Player</title>
-    <!-- Подключаем Telegram SDK, чтобы управлять окном -->
+    <title>Antigravity Cinema</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --primary: #ff0055;
+            --bg: #050505;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
         body,
         html {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
-            background: #000;
+            background: var(--bg);
+            color: #fff;
+            font-family: 'Outfit', sans-serif;
             overflow: hidden;
+        }
+
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+        }
+
+        #video-wrapper {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            background: #000;
             display: flex;
             align-items: center;
             justify-content: center;
+            position: relative;
+            overflow: hidden;
         }
 
-        #player {
-            width: 100vw;
-            height: 100vh;
-        }
-
-        /* Гарантируем, что видео заполнит всё окно */
+        /* Это заставит Webtor SDK занять ВСЁ место */
         video {
             width: 100% !important;
             height: 100% !important;
             object-fit: contain;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .loading-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: 0.5s ease;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255, 0, 85, 0.1);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .status-text {
+            color: #666;
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+
+        /* Кастомные кнопки управления если нужно */
+        .header {
+            padding: 15px 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-bottom: 1px solid #111;
+            display: flex;
+            align-items: center;
+            position: absolute;
+            top: 0;
+            width: 100%;
+            z-index: 50;
+            backdrop-filter: blur(10px);
         }
     </style>
 </head>
 
 <body>
-    <div id="player"></div>
+    <div class="app-container">
+        <div id="loading" class="loading-screen">
+            <div class="spinner"></div>
+            <div class="status-text">ПОДКЛЮЧЕНИЕ К ТОРРЕНТУ...</div>
+        </div>
+
+        <div id="video-wrapper">
+            <div id="player-target"></div>
+        </div>
+    </div>
 
     <script>
-        // Инициализация Telegram
         const tg = window.Telegram.WebApp;
         tg.ready();
-        tg.expand(); // МАГИЯ: Раскрывает плеер на весь экран телефона!
-        tg.backgroundColor = '#000000';
-        tg.headerColor = '#000000';
+        tg.expand(); // Раскрываем на максимум
+        tg.enableClosingConfirmation(); // Чтобы случайно не закрыли
 
         const urlParams = new URLSearchParams(window.location.search);
         const magnet = urlParams.get('magnet');
 
         if (magnet) {
-            document.getElementById('player').innerHTML = `
-                <video controls src="${magnet}" data-player="video.js"></video>
-            `;
+            const wrapper = document.getElementById('player-target');
+            // Создаем чистый тег для SDK
+            wrapper.innerHTML = `<video controls src="${magnet}" data-player="video.js"></video>`;
+
+            // Скрываем загрузку через 3 секунды (когда SDK подхватит)
+            setTimeout(() => {
+                document.getElementById('loading').style.opacity = '0';
+                setTimeout(() => document.getElementById('loading').style.display = 'none', 500);
+            }, 3000);
         } else {
-            document.body.innerHTML = '<div style="color:white;padding:20px;">ОШИБКА: МАГНИТ НЕ ПЕРЕДАН</div>';
+            document.querySelector('.status-text').innerText = 'ОШИБКА: НЕТ МАГНИТА';
         }
     </script>
-
-    <!-- SDK Webtor, который превращает тег video в мощный плеер -->
     <script src="https://cdn.jsdelivr.net/npm/@webtor/embed-sdk-js/dist/index.min.js" charset="utf-8" async></script>
 </body>
 
