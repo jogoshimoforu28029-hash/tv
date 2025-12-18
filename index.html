@@ -1,179 +1,57 @@
-<!DOCTYPE html>
-<html lang="ru">
+import asyncio
+import logging
+import re
+from aiohttp import ClientSession
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+from urllib.parse import quote
+from config import BOT_TOKEN
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Antigravity Private Cinema</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/webtorrent@latest/webtorrent.min.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --primary: #ff0055;
-            --bg: #000;
-        }
+# Твоя ссылка на GitHub Pages
+HTTPS_URL = "https://jogoshimoforu28029-hash.github.io/tv/" 
 
-        body,
-        html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            background: var(--bg);
-            color: #fff;
-            font-family: 'Outfit', sans-serif;
-            overflow: hidden;
-        }
+logging.basicConfig(level=logging.INFO)
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher()
 
-        #app {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            position: relative;
-        }
+async def search_torrents(query):
+    """Поиск торрентов через глобальное зеркало (RuTracker/NNM/Rutor)"""
+    safe_query = quote(query)
+    url = f"https://torrent-api-py.vercel.app/api/v1/all/search?query={safe_query}"
+    async with ClientSession() as session:
+        try:
+            async with session.get(url, timeout=10) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return sorted(data, key=lambda x: int(x.get('seeders', 0)) if str(x.get('seeders')).isdigit() else 0, reverse=True)[:5]
+        except: return []
+    return []
 
-        #player-container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #000;
-            position: relative;
-        }
+@dp.message(F.text.startswith("magnet:"))
+async def fast_magnet(message: types.Message):
+    url = f"{HTTPS_URL}?magnet={quote(message.text.strip())}"
+    kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🎬 ЗАПУСТИТЬ ПЛЕЕР", web_app=WebAppInfo(url=url))]])
+    await message.answer("🍿 Ссылка распознана. Кнопка ниже:", reply_markup=kb)
 
-        video {
-            width: 100%;
-            height: 100%;
-            max-height: 100vh;
-            outline: none;
-        }
+@dp.message(F.text)
+async def search_handler(message: types.Message):
+    if len(message.text) < 3: return
+    m = await message.answer("🔎 Ищу лучшие раздачи...")
+    results = await search_torrents(message.text)
+    await m.delete()
+    
+    if not results:
+        await message.answer("❌ Ничего не найдено. Попробуй на английском или ссылку magnet.")
+        return
 
-        .overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 10;
-            transition: 0.5s;
-        }
+    for t in results:
+        url = f"{HTTPS_URL}?magnet={quote(t['magnet'])}"
+        kb = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text=f"▶️ СМОТРЕТЬ ({t['size']})", web_app=WebAppInfo(url=url))]])
+        await message.answer(f"📦 **{t['name'][:80]}**", reply_markup=kb, parse_mode="Markdown")
 
-        .loader {
-            width: 60px;
-            height: 60px;
-            border: 4px solid rgba(255, 0, 85, 0.1);
-            border-top: 4px solid var(--primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 20px;
-        }
+async def main():
+    print("🚀 БОТ ОБНОВЛЕН. ЖДЕТ ЗАПРОСОВ.")
+    await dp.start_polling(bot)
 
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-
-        .progress-box {
-            width: 80%;
-            max-width: 300px;
-            text-align: center;
-        }
-
-        #status {
-            font-size: 14px;
-            color: var(--primary);
-            font-weight: 700;
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        #details {
-            font-size: 12px;
-            color: #555;
-            line-height: 1.6;
-        }
-
-        .hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-    </style>
-</head>
-
-<body>
-    <div id="app">
-        <div id="overlay" class="overlay">
-            <div class="loader"></div>
-            <div class="progress-box">
-                <div id="status">Инициализация...</div>
-                <div id="details">Подключение к пирам...</div>
-            </div>
-        </div>
-
-        <div id="player-container">
-            <!-- Сюда будет вставлено видео -->
-        </div>
-    </div>
-
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
-
-        const client = new WebTorrent();
-        const urlParams = new URLSearchParams(window.location.search);
-        const magnet = urlParams.get('magnet');
-
-        if (magnet) {
-            client.add(magnet, function (torrent) {
-                document.getElementById('status').innerText = 'РАСПАКОВКА ПОТОКА...';
-
-                // Находим самый большой файл (обычно это фильм)
-                const file = torrent.files.find(function (file) {
-                    return file.name.endsWith('.mp4') || file.name.endsWith('.mkv') || file.name.endsWith('.avi');
-                }) || torrent.files[0];
-
-                // Рендерим его прямо в наш контейнер
-                file.appendTo('#player-container', {
-                    autoplay: true,
-                    muted: false
-                }, function (err, elem) {
-                    if (err) {
-                        document.getElementById('status').innerText = 'ОШИБКА ФОРМАТА';
-                        return;
-                    }
-                    // Как только видео готово - убираем заставку
-                    document.getElementById('overlay').classList.add('hidden');
-                    elem.style.width = '100%';
-                    elem.style.height = '100%';
-                });
-
-                // Обновляем статистику
-                torrent.on('download', function (bytes) {
-                    document.getElementById('details').innerHTML = `
-                        Загружено: ${(torrent.downloaded / 1024 / 1024).toFixed(1)} MB<br>
-                        Скорость: ${(torrent.downloadSpeed / 1024 / 1024).toFixed(1)} MB/s<br>
-                        Пиры: ${torrent.numPeers}
-                    `;
-                });
-            });
-        } else {
-            document.getElementById('status').innerText = 'МАГНИТ НЕ НАЙДЕН';
-        }
-    </script>
-</body>
-
-</html>
+if __name__ == "__main__":
+    asyncio.run(main())
