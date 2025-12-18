@@ -3,8 +3,11 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Cinema Player</title>
+    <!-- Подключаем Telegram SDK, чтобы управлять окном -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body,
         html {
@@ -14,11 +17,21 @@
             height: 100%;
             background: #000;
             overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        video {
-            width: 100%;
+        #player {
+            width: 100vw;
             height: 100vh;
+        }
+
+        /* Гарантируем, что видео заполнит всё окно */
+        video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: contain;
         }
     </style>
 </head>
@@ -27,21 +40,26 @@
     <div id="player"></div>
 
     <script>
-        // Получаем магнит-ссылку из адреса
+        // Инициализация Telegram
+        const tg = window.Telegram.WebApp;
+        tg.ready();
+        tg.expand(); // МАГИЯ: Раскрывает плеер на весь экран телефона!
+        tg.backgroundColor = '#000000';
+        tg.headerColor = '#000000';
+
         const urlParams = new URLSearchParams(window.location.search);
         const magnet = urlParams.get('magnet');
 
         if (magnet) {
-            // Вставляем чистый видео-тег, который SDK превратит в плеер
             document.getElementById('player').innerHTML = `
                 <video controls src="${magnet}" data-player="video.js"></video>
             `;
         } else {
-            document.body.innerHTML = '<div style="color:white;padding:20px;">ОШИБКА: МАГНИТ-ССЫЛКА НЕ ПЕРЕДАНА</div>';
+            document.body.innerHTML = '<div style="color:white;padding:20px;">ОШИБКА: МАГНИТ НЕ ПЕРЕДАН</div>';
         }
     </script>
 
-    <!-- Подключаем SDK, который убирает лишний мусор и рекламу -->
+    <!-- SDK Webtor, который превращает тег video в мощный плеер -->
     <script src="https://cdn.jsdelivr.net/npm/@webtor/embed-sdk-js/dist/index.min.js" charset="utf-8" async></script>
 </body>
 
